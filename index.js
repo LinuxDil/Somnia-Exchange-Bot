@@ -734,9 +734,9 @@ function getSomniaExchangeMenuItems() {
   let items = [];
   if (swapRunning) items.push("Stop Transaction");
   items = items.concat([
-    "Auto Swap STT & USDT.g (pilih kembali untuk sebaliknya)",
-    "Auto Swap STT & NIA (pilih kembali untuk sebaliknya)",
-    "Auto Swap NIA & USDT.g (pilih kembali untuk sebaliknya)",
+    "Auto Swap STT & USDT.g",
+    "Auto Swap STT & NIA",
+    "Auto Swap NIA & USDT.g",
     "Change Random Amount",
     "Clear Transaction Logs",
     "Back To Main Menu",
