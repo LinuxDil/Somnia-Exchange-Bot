@@ -22,6 +22,7 @@ const ERC20ABI = [
 const ROUTER_ABI = [
   "function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) public payable returns (uint256[])",
   "function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline) public returns (uint256[])",
+  "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline) public returns (uint256[])",
   "function getAmountsOut(uint256 amountIn, address[] path) view returns (uint256[])"
 ];
 
@@ -67,6 +68,7 @@ let globalWallet = null;
 let provider = null;
 let lastSwapDirectionSttUsdtg = "USDTG_TO_STT";
 let lastSwapDirectionSttNia = "NIA_TO_STT";
+let lastSwapDirectionNiaUsdtg = "NIA_TO_USDTG"
 
 function getShortAddress(address) {
   return address ? address.slice(0, 6) + "..." + address.slice(-4) : "N/A";
@@ -262,7 +264,7 @@ async function executeSwapWithNonceRetry(txFn, returnTx = false, maxRetries = 3)
     }
   }
 }
-
+// dari sini
 async function autoSwapSttUsdtg() {
   try {
     const routerContract = new ethers.Contract(ROUTER_ADDRESS, ROUTER_ABI, globalWallet);
@@ -350,7 +352,7 @@ async function autoSwapSttUsdtg() {
     return false;
   }
 }
-
+// STT ke NIA
 async function autoSwapSttNia() {
   try {
     const routerContract = new ethers.Contract(ROUTER_ADDRESS, ROUTER_ABI, globalWallet);
@@ -438,7 +440,95 @@ async function autoSwapSttNia() {
     return false;
   }
 }
+// Nia ke USDT
+async function autoSwapNiaUsdtg() {
+  try {
+    const routerContract = new ethers.Contract(ROUTER_ADDRESS, ROUTER_ABI, globalWallet);
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+    const niaBalance = parseFloat(walletInfo.balanceNia);
+    const usdtgBalance = parseFloat(walletInfo.balanceUsdtg);
+    const niaAmount = getRandomNumber(1, 5, 10);
+    const usdtgAmount = getRandomNumber(0.04, 0.21, 4);
 
+    addLog(`Arah swap saat ini: ${lastSwapDirectionNiaUsdtg}`, "debug");
+    addLog(`Saldo: NIA=${niaBalance}, USDT.g=${usdtgBalance}`, "debug");
+
+    let receipt;
+
+    if (lastSwapDirectionNiaUsdtg === "USDTG_TO_NIA") {
+      if (niaBalance < niaAmount) {
+        addLog(`Saldo NIA tidak cukup: ${niaBalance} < ${niaAmount}`, "warning");
+        return false;
+      }
+
+      const amountIn = ethers.parseEther(niaAmount.toString());
+      const path = [NIA_ADDRESS, USDTG_ADDRESS];
+      const amountOutMin = await getAmountOut(amountIn, path);
+      const slippage = amountOutMin * BigInt(95) / BigInt(100);
+
+      addLog(`Melakukan swap ${niaAmount} NIA ➯ USDT.g`, "swap");
+
+      receipt = await executeSwapWithNonceRetry(async (nonce) => {
+        return await routerContract.swapExactTokensForTokens(
+          slippage,
+          path,
+          globalWallet.address,
+          deadline,
+          { value: amountIn, gasLimit: 300000, nonce }
+        );
+      });
+
+      if (receipt.status === 1) {
+        addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
+        await reportTransaction();
+        lastSwapDirectionNiaUsdtg = "NIA_TO_USDTG";
+        addLog(`Arah swap diubah ke: ${lastSwapDirectionNiaUsdtg}`, "debug");
+        return true;
+      }
+    } else {
+      if (usdtgBalance < usdtgAmount) {
+        addLog(`Saldo USDT.g tidak cukup: ${usdtgBalance} < ${usdtgAmount}`, "warning");
+        return false;
+      }
+
+      const tokenContract = new ethers.Contract(USDTG_ADDRESS, ERC20ABI, globalWallet);
+      const decimals = await tokenContract.decimals();
+      const amountIn = ethers.parseUnits(niaAmount.toString(), decimals);
+      const path = [USDTG_ADDRESS, NIA_ADDRESS];
+      const amountOutMin = await getAmountOut(amountIn, path);
+      const slippage = amountOutMin * BigInt(95) / BigInt(100);
+
+      const approved = await approveToken(USDTG_ADDRESS, usdtgAmount);
+      if (!approved) return false;
+
+      addLog(`Melakukan swap ${usdtgAmount} USDT.g ➯ NIA`, "swap");
+
+      receipt = await executeSwapWithNonceRetry(async (nonce) => {
+        return await routerContract.swapExactTokensForTokens(
+          amountIn,
+          slippage,
+          path,
+          globalWallet.address,
+          deadline,
+          { gasLimit: 300000, nonce }
+        );
+      });
+
+      if (receipt.status === 1) {
+        addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
+        await reportTransaction();
+        lastSwapDirectionNiaUsdtg = "USDTG_TO_NIA";
+        addLog(`Arah swap diubah ke: ${lastSwapDirectionNiaUsdtg}`, "debug");
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    addLog(`Gagal melakukan swap: ${error.message}`, "error");
+    return false;
+  }
+}
+// sampai sini
 async function runAutoSwap(pair, autoSwapFunction, lastSwapDirection) {
   promptBox.setFront();
   promptBox.readInput(`Masukkan jumlah swap untuk ${pair}`, "", async (err, value) => {
@@ -636,6 +726,7 @@ function getSomniaExchangeMenuItems() {
   items = items.concat([
     "Auto Swap STT & USDT.g",
     "Auto Swap STT & NIA",
+    "Auto Swap NIA & USDT.g",
     "Change Random Amount",
     "Clear Transaction Logs",
     "Back To Main Menu",
@@ -666,7 +757,7 @@ const changeRandomAmountSubMenu = blessed.list({
   tags: true,
   border: { type: "line" },
   style: { fg: "white", bg: "default", border: { fg: "red" }, selected: { bg: "cyan", fg: "black" } },
-  items: ["STT & USDT.g", "STT & NIA", "Back To Somnia Exchange Menu"]
+  items: ["STT & USDT.g", "STT & NIA", "NIA & USDT.g", "Back To Somnia Exchange Menu"]
 });
 changeRandomAmountSubMenu.hide();
 
@@ -763,6 +854,12 @@ somniaExchangeSubMenu.on("select", (item) => {
       addLog("Transaksi Somnia Exchange sedang berjalan. Hentikan transaksi terlebih dahulu.", "warning");
     } else {
       runAutoSwap("STT & NIA", autoSwapSttNia, lastSwapDirectionSttNia);
+    }
+  } else if (selected === "Auto Swap NIA & USDT.g") {
+    if (swapRunning) {
+      addLog("Transaksi Somnia Exchange sedang berjalan. Hentikan transaksi terlebih dahulu.", "warning");
+    } else {
+      runAutoSwap("NIA & USDT.g", autoSwapNiaUsdtg, lastSwapDirectionNiaUsdtg);
     }
   } else if (selected === "Change Random Amount") {
     somniaExchangeSubMenu.hide();
