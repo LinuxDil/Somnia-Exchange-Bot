@@ -440,21 +440,23 @@ async function autoSwapSttNia() {
     return false;
   }
 }
-// Nia ke USDT
+// NIA ke USDT.g Auto Swap
 async function autoSwapNiaUsdtg() {
   try {
     const routerContract = new ethers.Contract(ROUTER_ADDRESS, ROUTER_ABI, globalWallet);
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
     const niaBalance = parseFloat(walletInfo.balanceNia);
     const usdtgBalance = parseFloat(walletInfo.balanceUsdtg);
-    const niaAmount = getRandomNumber(1, 5, 10);
-    const usdtgAmount = getRandomNumber(0.04, 0.21, 4);
+
+    const niaAmount = getRandomNumber(10, 30, 50);         // Jumlah NIA untuk swap ke USDT.g
+    const usdtgAmount = getRandomNumber(0.004, 0.021, 4);  // Jumlah USDT.g untuk swap ke NIA
 
     addLog(`Arah swap saat ini: ${lastSwapDirectionNiaUsdtg}`, "debug");
     addLog(`Saldo: NIA=${niaBalance}, USDT.g=${usdtgBalance}`, "debug");
 
     let receipt;
 
+    // === NIA ke USDT.g ===
     if (lastSwapDirectionNiaUsdtg === "USDTG_TO_NIA") {
       if (niaBalance < niaAmount) {
         addLog(`Saldo NIA tidak cukup: ${niaBalance} < ${niaAmount}`, "warning");
@@ -466,15 +468,19 @@ async function autoSwapNiaUsdtg() {
       const amountOutMin = await getAmountOut(amountIn, path);
       const slippage = amountOutMin * BigInt(95) / BigInt(100);
 
+      const approved = await approveToken(NIA_ADDRESS, amountIn);
+      if (!approved) return false;
+
       addLog(`Melakukan swap ${niaAmount} NIA ➯ USDT.g`, "swap");
 
       receipt = await executeSwapWithNonceRetry(async (nonce) => {
         return await routerContract.swapExactTokensForTokens(
+          amountIn,
           slippage,
           path,
           globalWallet.address,
           deadline,
-          { value: amountIn, gasLimit: 300000, nonce }
+          { gasLimit: 300000, nonce }
         );
       });
 
@@ -485,6 +491,8 @@ async function autoSwapNiaUsdtg() {
         addLog(`Arah swap diubah ke: ${lastSwapDirectionNiaUsdtg}`, "debug");
         return true;
       }
+
+    // === USDT.g ke NIA ===
     } else {
       if (usdtgBalance < usdtgAmount) {
         addLog(`Saldo USDT.g tidak cukup: ${usdtgBalance} < ${usdtgAmount}`, "warning");
@@ -493,12 +501,12 @@ async function autoSwapNiaUsdtg() {
 
       const tokenContract = new ethers.Contract(USDTG_ADDRESS, ERC20ABI, globalWallet);
       const decimals = await tokenContract.decimals();
-      const amountIn = ethers.parseUnits(niaAmount.toString(), decimals);
+      const amountIn = ethers.parseUnits(usdtgAmount.toString(), decimals);
       const path = [USDTG_ADDRESS, NIA_ADDRESS];
       const amountOutMin = await getAmountOut(amountIn, path);
       const slippage = amountOutMin * BigInt(95) / BigInt(100);
 
-      const approved = await approveToken(USDTG_ADDRESS, usdtgAmount);
+      const approved = await approveToken(USDTG_ADDRESS, amountIn);
       if (!approved) return false;
 
       addLog(`Melakukan swap ${usdtgAmount} USDT.g ➯ NIA`, "swap");
@@ -522,12 +530,14 @@ async function autoSwapNiaUsdtg() {
         return true;
       }
     }
+
     return false;
   } catch (error) {
     addLog(`Gagal melakukan swap: ${error.message}`, "error");
     return false;
   }
 }
+
 // sampai sini
 async function runAutoSwap(pair, autoSwapFunction, lastSwapDirection) {
   promptBox.setFront();
@@ -724,9 +734,9 @@ function getSomniaExchangeMenuItems() {
   let items = [];
   if (swapRunning) items.push("Stop Transaction");
   items = items.concat([
-    "Auto Swap STT & USDT.g",
-    "Auto Swap STT & NIA",
-    "Auto Swap NIA & USDT.g",
+    "Auto Swap STT & USDT.g (pilih kembali untuk sebaliknya)",
+    "Auto Swap STT & NIA (pilih kembali untuk sebaliknya)",
+    "Auto Swap NIA & USDT.g (pilih kembali untuk sebaliknya)",
     "Change Random Amount",
     "Clear Transaction Logs",
     "Back To Main Menu",
