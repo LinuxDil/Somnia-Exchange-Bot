@@ -767,7 +767,7 @@ const changeRandomAmountSubMenu = blessed.list({
   tags: true,
   border: { type: "line" },
   style: { fg: "white", bg: "default", border: { fg: "red" }, selected: { bg: "cyan", fg: "black" } },
-  items: ["STT & USDT.g", "STT & NIA", "NIA & USDT.g", "Back To Somnia Exchange Menu"]
+  items: ["STT & USDT.g", "STT & NIA", "Back To Somnia Exchange Menu"]
 });
 changeRandomAmountSubMenu.hide();
 
