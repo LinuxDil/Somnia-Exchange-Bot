@@ -448,7 +448,7 @@ async function autoSwapNiaUsdtg() {
     const niaBalance = parseFloat(walletInfo.balanceNia);
     const usdtgBalance = parseFloat(walletInfo.balanceUsdtg);
 
-    const niaAmount = getRandomNumber(1, 6, 2);         // Jumlah NIA untuk swap ke USDT.g
+    const niaAmount = getRandomNumber(1, 4, 2);         // Jumlah NIA untuk swap ke USDT.g
     const usdtgAmount = getRandomNumber(0.03, 0.07, 2);  // Jumlah USDT.g untuk swap ke NIA
 
     addLog(`Arah swap saat ini: ${lastSwapDirectionNiaUsdtg}`, "debug");
