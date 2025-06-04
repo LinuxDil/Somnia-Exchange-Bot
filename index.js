@@ -264,7 +264,7 @@ async function executeSwapWithNonceRetry(txFn, returnTx = false, maxRetries = 3)
     }
   }
 }
-// dari sini
+// dari sini update api
 async function autoSwapSttUsdtg() {
   try {
     const routerContract = new ethers.Contract(ROUTER_ADDRESS, ROUTER_ABI, globalWallet);
