@@ -1,5 +1,5 @@
 # Somnia-Exchange-Bot
-Somnia Automation Bot for Exchange
+Somnia Automation Bot for Exchange, as aja
 
 ## How to run? Join Our Telegram Channel
 
