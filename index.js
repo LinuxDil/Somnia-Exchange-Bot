@@ -153,7 +153,7 @@ async function updateWalletData() {
     }
 
     updateWallet();
-    addLog("Informasi Wallet Diperbarui!", "system");
+    addLog("Wallet Information Updated!", "system");
   } catch (error) {
     addLog("Gagal mengambil data wallet: " + error.message, "error");
   }
@@ -463,8 +463,8 @@ async function runAutoSwap(pair, autoSwapFunction, lastSwapDirection) {
       }
       if (i < loopCount && !swapCancelled) {
         const delayTime = getRandomDelay();
-        const minutes = Math.floor(delayTime / 60000);
-        const seconds = Math.floor((delayTime % 60000) / 1000);
+        const minutes = Math.floor(delayTime / 240000);
+        const seconds = Math.floor((delayTime % 240000) / 60000);
         addLog(`Swap ke-${i} Selesai. Menunggu ${minutes} menit ${seconds} detik.`, "swap");
 
         const startTime = Date.now();
@@ -594,7 +594,7 @@ const logsBox = blessed.box({
 });
 
 const walletBox = blessed.box({
-  label: " Informasi Wallet ",
+  label: " Wallet Information ",
   border: { type: "line" },
   tags: true,
   style: { border: { fg: "magenta" }, fg: "white", bg: "default" },
