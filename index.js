@@ -22,7 +22,6 @@ const ERC20ABI = [
 const ROUTER_ABI = [
   "function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) public payable returns (uint256[])",
   "function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline) public returns (uint256[])",
-  "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline) public returns (uint256[])",
   "function getAmountsOut(uint256 amountIn, address[] path) view returns (uint256[])"
 ];
 
@@ -68,7 +67,6 @@ let globalWallet = null;
 let provider = null;
 let lastSwapDirectionSttUsdtg = "USDTG_TO_STT";
 let lastSwapDirectionSttNia = "NIA_TO_STT";
-let lastSwapDirectionNiaUsdtg = "NIA_TO_USDTG"
 
 function getShortAddress(address) {
   return address ? address.slice(0, 6) + "..." + address.slice(-4) : "N/A";
@@ -93,9 +91,8 @@ function getRandomDelay() {
   return Math.random() * (60000 - 30000) + 30000;
 }
 
-function getRandomNumber(min, max, decimals = 4) {
-  const random = Math.random() * (max - min) + min;
-  return parseFloat(random.toFixed(decimals));
+function getRandomNumber(min, max) {
+  return Number((Math.random() * (max - min) + min).toFixed(3));
 }
 
 function updateLogs() {
@@ -209,7 +206,7 @@ async function getAmountOut(amountIn, path) {
     const amounts = await routerContract.getAmountsOut(amountIn, path);
     return amounts[amounts.length - 1];
   } catch (error) {
-    addLog(`Gagal menghitung amountOut: ${error.message}`, "error");
+    addLog(`Gagal / amountOut: ${error.message}`, "error");
     return ethers.parseEther("0");
   }
 }
@@ -264,18 +261,15 @@ async function executeSwapWithNonceRetry(txFn, returnTx = false, maxRetries = 3)
     }
   }
 }
-// dari sini update api
+
 async function autoSwapSttUsdtg() {
   try {
     const routerContract = new ethers.Contract(ROUTER_ADDRESS, ROUTER_ABI, globalWallet);
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
     const sttBalance = parseFloat(walletInfo.balanceStt);
     const usdtgBalance = parseFloat(walletInfo.balanceUsdtg);
-    const sttAmount = getRandomNumber(0.01, 0.05, 4);
-    const usdtgAmount = getRandomNumber(0.04, 0.21, 4);
-
-    addLog(`Arah swap saat ini: ${lastSwapDirectionSttUsdtg}`, "debug");
-    addLog(`Saldo: STT=${sttBalance}, USDT.g=${usdtgBalance}`, "debug");
+    const sttAmount = getRandomNumber(0.01, 0.05);
+    const usdtgAmount = getRandomNumber(0.04, 0.21);
 
     let receipt;
 
@@ -290,7 +284,7 @@ async function autoSwapSttUsdtg() {
       const amountOutMin = await getAmountOut(amountIn, path);
       const slippage = amountOutMin * BigInt(95) / BigInt(100);
 
-      addLog(`Melakukan swap ${sttAmount} STT ➯ USDT.g`, "swap");
+      addLog(`Melakukan swap ${sttAmount} STT ➯ USDTg`, "swap");
 
       receipt = await executeSwapWithNonceRetry(async (nonce) => {
         return await routerContract.swapExactETHForTokens(
@@ -298,7 +292,7 @@ async function autoSwapSttUsdtg() {
           path,
           globalWallet.address,
           deadline,
-          { value: amountIn, gasLimit: 300000, nonce }
+          { value: amountIn, gasLimit: 2000000, nonce }
         );
       });
 
@@ -306,12 +300,11 @@ async function autoSwapSttUsdtg() {
         addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
         await reportTransaction();
         lastSwapDirectionSttUsdtg = "STT_TO_USDTG";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionSttUsdtg}`, "debug");
         return true;
       }
     } else {
       if (usdtgBalance < usdtgAmount) {
-        addLog(`Saldo USDT.g tidak cukup: ${usdtgBalance} < ${usdtgAmount}`, "warning");
+        addLog(`Saldo USDTg tidak cukup: ${usdtgBalance} < ${usdtgAmount}`, "warning");
         return false;
       }
 
@@ -325,7 +318,7 @@ async function autoSwapSttUsdtg() {
       const approved = await approveToken(USDTG_ADDRESS, usdtgAmount);
       if (!approved) return false;
 
-      addLog(`Melakukan swap ${usdtgAmount} USDT.g ➯ STT`, "swap");
+      addLog(`Melakukan swap ${usdtgAmount} USDTg ➯ STT`, "swap");
 
       receipt = await executeSwapWithNonceRetry(async (nonce) => {
         return await routerContract.swapExactTokensForETH(
@@ -334,7 +327,7 @@ async function autoSwapSttUsdtg() {
           path,
           globalWallet.address,
           deadline,
-          { gasLimit: 300000, nonce }
+          { gasLimit: 2000000, nonce }
         );
       });
 
@@ -342,7 +335,6 @@ async function autoSwapSttUsdtg() {
         addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
         await reportTransaction();
         lastSwapDirectionSttUsdtg = "USDTG_TO_STT";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionSttUsdtg}`, "debug");
         return true;
       }
     }
@@ -352,18 +344,15 @@ async function autoSwapSttUsdtg() {
     return false;
   }
 }
-// STT ke NIA
+
 async function autoSwapSttNia() {
   try {
     const routerContract = new ethers.Contract(ROUTER_ADDRESS, ROUTER_ABI, globalWallet);
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
     const sttBalance = parseFloat(walletInfo.balanceStt);
     const niaBalance = parseFloat(walletInfo.balanceNia);
-    const sttAmount = getRandomNumber(0.01, 0.05, 4);
-    const niaAmount = getRandomNumber(2, 10, 4);
-
-    addLog(`Arah swap saat ini: ${lastSwapDirectionSttNia}`, "debug");
-    addLog(`Saldo: STT=${sttBalance}, NIA=${niaBalance}`, "debug");
+    const sttAmount = getRandomNumber(0.01, 0.05);
+    const niaAmount = getRandomNumber(2, 10);
 
     let receipt;
 
@@ -386,7 +375,7 @@ async function autoSwapSttNia() {
           path,
           globalWallet.address,
           deadline,
-          { value: amountIn, gasLimit: 300000, nonce }
+          { value: amountIn, gasLimit: 2000000, nonce }
         );
       });
 
@@ -394,7 +383,6 @@ async function autoSwapSttNia() {
         addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
         await reportTransaction();
         lastSwapDirectionSttNia = "STT_TO_NIA";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionSttNia}`, "debug");
         return true;
       }
     } else {
@@ -422,7 +410,7 @@ async function autoSwapSttNia() {
           path,
           globalWallet.address,
           deadline,
-          { gasLimit: 300000, nonce }
+          { gasLimit: 2000000, nonce }
         );
       });
 
@@ -430,7 +418,6 @@ async function autoSwapSttNia() {
         addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
         await reportTransaction();
         lastSwapDirectionSttNia = "NIA_TO_STT";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionSttNia}`, "debug");
         return true;
       }
     }
@@ -440,105 +427,7 @@ async function autoSwapSttNia() {
     return false;
   }
 }
-// NIA ke USDT.g Auto Swap
-async function autoSwapNiaUsdtg() {
-  try {
-    const routerContract = new ethers.Contract(ROUTER_ADDRESS, ROUTER_ABI, globalWallet);
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
-    const niaBalance = parseFloat(walletInfo.balanceNia);
-    const usdtgBalance = parseFloat(walletInfo.balanceUsdtg);
 
-    const niaAmount = getRandomNumber(1, 4, 2);         // Jumlah NIA untuk swap ke USDT.g
-    const usdtgAmount = getRandomNumber(0.03, 0.07, 2);  // Jumlah USDT.g untuk swap ke NIA
-
-    addLog(`Arah swap saat ini: ${lastSwapDirectionNiaUsdtg}`, "debug");
-    addLog(`Saldo: NIA=${niaBalance}, USDT.g=${usdtgBalance}`, "debug");
-
-    let receipt;
-
-    // === NIA ke USDT.g ===
-    if (lastSwapDirectionNiaUsdtg === "USDTG_TO_NIA") {
-      if (niaBalance < niaAmount) {
-        addLog(`Saldo NIA tidak cukup: ${niaBalance} < ${niaAmount}`, "warning");
-        return false;
-      }
-
-      const amountIn = ethers.parseEther(niaAmount.toString());
-      const path = [NIA_ADDRESS, USDTG_ADDRESS];
-      const amountOutMin = await getAmountOut(amountIn, path);
-      const slippage = amountOutMin * BigInt(95) / BigInt(100);
-
-      const approved = await approveToken(NIA_ADDRESS, amountIn);
-      if (!approved) return false;
-
-      addLog(`Melakukan swap ${niaAmount} NIA ➯ USDT.g`, "swap");
-
-      receipt = await executeSwapWithNonceRetry(async (nonce) => {
-        return await routerContract.swapExactTokensForTokens(
-          amountIn,
-          slippage,
-          path,
-          globalWallet.address,
-          deadline,
-          { gasLimit: 300000, nonce }
-        );
-      });
-
-      if (receipt.status === 1) {
-        addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
-        await reportTransaction();
-        lastSwapDirectionNiaUsdtg = "NIA_TO_USDTG";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionNiaUsdtg}`, "debug");
-        return true;
-      }
-
-    // === USDT.g ke NIA ===
-    } else {
-      if (usdtgBalance < usdtgAmount) {
-        addLog(`Saldo USDT.g tidak cukup: ${usdtgBalance} < ${usdtgAmount}`, "warning");
-        return false;
-      }
-
-      const tokenContract = new ethers.Contract(USDTG_ADDRESS, ERC20ABI, globalWallet);
-      const decimals = await tokenContract.decimals();
-      const amountIn = ethers.parseUnits(usdtgAmount.toString(), decimals);
-      const path = [USDTG_ADDRESS, NIA_ADDRESS];
-      const amountOutMin = await getAmountOut(amountIn, path);
-      const slippage = amountOutMin * BigInt(95) / BigInt(100);
-
-      const approved = await approveToken(USDTG_ADDRESS, amountIn);
-      if (!approved) return false;
-
-      addLog(`Melakukan swap ${usdtgAmount} USDT.g ➯ NIA`, "swap");
-
-      receipt = await executeSwapWithNonceRetry(async (nonce) => {
-        return await routerContract.swapExactTokensForTokens(
-          amountIn,
-          slippage,
-          path,
-          globalWallet.address,
-          deadline,
-          { gasLimit: 300000, nonce }
-        );
-      });
-
-      if (receipt.status === 1) {
-        addLog(`Swap Berhasil. Hash: ${receipt.hash}`, "success");
-        await reportTransaction();
-        lastSwapDirectionNiaUsdtg = "USDTG_TO_NIA";
-        addLog(`Arah swap diubah ke: ${lastSwapDirectionNiaUsdtg}`, "debug");
-        return true;
-      }
-    }
-
-    return false;
-  } catch (error) {
-    addLog(`Gagal melakukan swap: ${error.message}`, "error");
-    return false;
-  }
-}
-
-// sampai sini
 async function runAutoSwap(pair, autoSwapFunction, lastSwapDirection) {
   promptBox.setFront();
   promptBox.readInput(`Masukkan jumlah swap untuk ${pair}`, "", async (err, value) => {
@@ -594,7 +483,7 @@ async function runAutoSwap(pair, autoSwapFunction, lastSwapDirection) {
     mainMenu.setItems(getMainMenuItems());
     somniaExchangeSubMenu.setItems(getSomniaExchangeMenuItems());
     safeRender();
-    addLog(`Somnia Exchange: Auto Swap untuk ${pair} selesai.`, "swap");
+    addLog(`Somnia Exchange: Auto Swap ${pair} selesai.`, "swap");
   });
 }
 
@@ -736,7 +625,6 @@ function getSomniaExchangeMenuItems() {
   items = items.concat([
     "Auto Swap STT & USDT.g",
     "Auto Swap STT & NIA",
-    "Auto Swap NIA & USDT.g",
     "Change Random Amount",
     "Clear Transaction Logs",
     "Back To Main Menu",
@@ -801,7 +689,7 @@ function adjustLayout() {
   headerBox.top = 0;
   headerBox.height = headerHeight;
   headerBox.width = "100%";
-  descriptionBox.top = "23%";
+  descriptionBox.top = "25%";
   descriptionBox.height = Math.floor(screenHeight * 0.05);
   logsBox.top = headerHeight + descriptionBox.height;
   logsBox.left = 0;
@@ -865,12 +753,6 @@ somniaExchangeSubMenu.on("select", (item) => {
     } else {
       runAutoSwap("STT & NIA", autoSwapSttNia, lastSwapDirectionSttNia);
     }
-  } else if (selected === "Auto Swap NIA & USDT.g") {
-    if (swapRunning) {
-      addLog("Transaksi Somnia Exchange sedang berjalan. Hentikan transaksi terlebih dahulu.", "warning");
-    } else {
-      runAutoSwap("NIA & USDT.g", autoSwapNiaUsdtg, lastSwapDirectionNiaUsdtg);
-    }
   } else if (selected === "Change Random Amount") {
     somniaExchangeSubMenu.hide();
     changeRandomAmountSubMenu.show();
@@ -917,5 +799,5 @@ screen.key(["C-down"], () => { logsBox.scroll(1); safeRender(); });
 
 safeRender();
 mainMenu.focus();
-addLog("Dont Forget Join Telegram @AirdropSeeker_Official!!", "system");
+addLog("Dont Forget To Join Telegram https://t.me/AirdropSeeker_Official!!", "system");
 updateWalletData();
