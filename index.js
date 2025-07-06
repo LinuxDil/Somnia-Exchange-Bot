@@ -88,8 +88,11 @@ function addLog(message, type) {
 }
 
 function getRandomDelay() {
-  return Math.random() * (60000 - 30000) + 30000;
+  const min = 2 * 60 * 1000; // 2 menit = 120000 ms
+  const max = 5 * 60 * 1000; // 5 menit = 300000 ms
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
 
 function getRandomNumber(min, max) {
   return Number((Math.random() * (max - min) + min).toFixed(3));
@@ -463,8 +466,8 @@ async function runAutoSwap(pair, autoSwapFunction, lastSwapDirection) {
       }
       if (i < loopCount && !swapCancelled) {
         const delayTime = getRandomDelay();
-        const minutes = Math.floor(delayTime / 240000);
-        const seconds = Math.floor((delayTime % 240000) / 60000);
+        const minutes = Math.floor(delayTime / 60000);
+        const seconds = Math.floor((delayTime % 60000) / 1000);
         addLog(`Swap ke-${i} Selesai. Menunggu ${minutes} menit ${seconds} detik.`, "swap");
 
         const startTime = Date.now();
