@@ -1,3 +1,4 @@
+
 import "dotenv/config";
 import blessed from "blessed";
 import figlet from "figlet";
@@ -32,7 +33,7 @@ const randomAmountRanges = {
 
 const globalHeaders = {
   'accept': 'application/json',
-  'accept-encoding': 'gzip, deflate, br, zstd',
+  'accept-encoding': 'gzip, deflate, br',
   'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
   'cache-control': 'no-cache',
   'content-type': 'application/json',
@@ -88,11 +89,8 @@ function addLog(message, type) {
 }
 
 function getRandomDelay() {
-  const min = 2 * 60 * 1000; // 2 menit = 120000 ms
-  const max = 5 * 60 * 1000; // 5 menit = 300000 ms
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.random() * (60000 - 30000) + 30000;
 }
-
 
 function getRandomNumber(min, max) {
   return Number((Math.random() * (max - min) + min).toFixed(3));
@@ -156,7 +154,7 @@ async function updateWalletData() {
     }
 
     updateWallet();
-    addLog("Wallet Information Updated!", "system");
+    addLog("Informasi Wallet Diperbarui!", "system");
   } catch (error) {
     addLog("Gagal mengambil data wallet: " + error.message, "error");
   }
@@ -597,7 +595,7 @@ const logsBox = blessed.box({
 });
 
 const walletBox = blessed.box({
-  label: " Wallet Information ",
+  label: " Informasi Wallet ",
   border: { type: "line" },
   tags: true,
   style: { border: { fg: "magenta" }, fg: "white", bg: "default" },
@@ -802,5 +800,5 @@ screen.key(["C-down"], () => { logsBox.scroll(1); safeRender(); });
 
 safeRender();
 mainMenu.focus();
-addLog("Dont Forget To Join Telegram https://t.me/AirdropSeeker_Official!!", "system");
+addLog("Dont Forget To  Join https://t.me/AirdropSeeker_Official!!", "system");
 updateWalletData();
